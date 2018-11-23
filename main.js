@@ -1,100 +1,90 @@
 const fetch = require("node-fetch")
 const fs = require("fs")
 var http = require('http')
-var lineReader = require('line-reader');
-let symbol = "MNST"
-let content = [];
-var currentPrice = '';
+var lineReader = require('readline');
+let userData = [];    updateUserData();
+let apikey = "W94GLMLUDBL7TFZ8";
 
-function url(){
-    return "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol="+symbol+"&apikey=W94GLMLUDBL7TFZ8";
+function url(symbol){//vahepeal tuleb info üle päeva, enne oli function=TIME_SERIES_DAILY(võtsin uue, mis näitab vist täpsemini laivis)
+    return "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol="+symbol+"&apikey="+apikey;
 }
-    
     
 fs.readFile('./index.html', function (err, html) {
     if (err) {
-    throw err; 
+        throw err; 
     }
 
-http.createServer(function (request, response) {
-    let body = '';
-    request.on('data', chunk => {
-        body += chunk.toString(); // convert Buffer to string
-    });
-    request.on('end', () => {
-        if(body != ''){
+    http.createServer(async function (request, response) {
+        if(request.url === "/favicon.ico"){
+            response.end();
+        }else{
 
-            body = body.replace("name=", "")
-            body = body.replace("&price=", " ")
+            let body = '';
+            request.on('data', data => {
+                body += data.toString(); // convert Buffer to string
+            });
+            request.on('end', () => {
+                if(body != ''){
 
-            fs.appendFile('userdata.txt', body+"\n", function (err) {
-                if (err) throw err;
-                console.log('Added');
-              });
+                    body = body.replace("name=", "")
+                    body = body.replace("&price=", " ")
+
+                    fs.appendFile('userdata.txt', body+"\n", function (err) {
+                        if (err) throw err;
+                        console.log('Added');
+                        updateUserData();
+                    });
+                }
+            });
+            
+            for(let i = 0; i < userData.length; i++){
+                console.log(userData[i][0] + " :--: " + await getCurrentPrice(userData[i][0]))
+            }
+            
+            response.writeHeader(200, {"Content-Type": "text/html"});
+            response.write(html);
+            response.end();
         }
-        response.end('ok');
-    
-    });
-    console.log(getCurrentPrice('NVDA'))
-
-    //runnib 2x, ei tea mix
-    getPackage();
-    getUserData();
-    response.writeHeader(200, {"Content-Type": "text/html"});
-    response.write(html);
-    response.end();
-}).listen(8080)
+    }).listen(8080)
 });
 
 
+async function getCurrentPrice(symbol){ //call "await getCurrentPrice('NVDA');"
+    //let date = today();
 
-function getCurrentPrice(name){
-    //huj tootab igal pool
-    let date = today();
-    symbol = name;
-
-    fetch(url()) 
-    .then(res => res.json())
-    .then(function(myjson){
-        currentPrice = myjson['Time Series (Daily)'][date]["4. close"];
-        
-    });
-    return currentPrice;
+    const fetchResult = fetch(url(symbol))
+    const response = await fetchResult;
+    const jsonData = await response.json();
+    //console.log(jsonData)
+    try{
+        return jsonData["Global Quote"]["05. price"]; 
+    }catch(e){}
+    //return jsonData['Time Series (Daily)'][date]["4. close"]; 
 }
 
-function today(){
+/*function today(){
     var today = new Date();
-    var dd = 20/*today.getDate()*/;
+    var dd = today.getDate();
     var mm = today.getMonth()+1;
     var yyyy = today.getFullYear();
-    
+    console.log(dd)
     if(dd<10) {
-        dd = '0'+dd
-    } 
+        dd = '0'+dd;
+    }
     
     if(mm<10) {
-        mm = '0'+mm
+        mm = '0'+mm;
     } 
-    date = yyyy+'-'+mm+'-'+dd;
 
-    return date;
+    return yyyy+'-'+mm+'-'+dd;
+}*/
 
-
-}
-
-function getUserData(){
-    lineReader.eachLine('userdata.txt', function(line, last) {
-        content.push(line.split(" "));
-        //ei toota
-        if(last){
-            console.log(content[0][0])
-            
-        }
+function updateUserData(){ 
+    var Reader = lineReader.createInterface({
+        input: fs.createReadStream('userdata.txt')
     });
-    
+      
+    Reader.on('line', function (line) {
+        userData.push(line.split(" "));
+    });
 }
-
-
-
-
-
