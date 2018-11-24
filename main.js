@@ -2,17 +2,16 @@ const fetch = require("node-fetch")
 const fs = require("fs")
 var http = require('http')
 var lineReader = require('readline');
-let userData = [];    updateUserData();
+let userData = []; // [][name, boughtFor, livePrice]
+updateUserData(true); //reads userdata.txt
 let apikey = "W94GLMLUDBL7TFZ8";
 
-function url(symbol){//vahepeal tuleb info üle päeva, enne oli function=TIME_SERIES_DAILY(võtsin uue, mis näitab vist täpsemini laivis)
+function url(symbol){
     return "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol="+symbol+"&apikey="+apikey;
 }
     
 fs.readFile('./index.html', function (err, html) {
-    if (err) {
-        throw err; 
-    }
+    if (err) throw err;
 
     http.createServer(async function (request, response) {
         if(request.url === "/favicon.ico"){
@@ -30,24 +29,42 @@ fs.readFile('./index.html', function (err, html) {
                     body = body.replace("&price=", " ")
 
                     fs.appendFile('userdata.txt', body+"\n", function (err) {
-                        if (err) throw err;
-                        console.log('Added');
-                        updateUserData();
+                        updateUserData(false);
                     });
                 }
             });
-            
-            for(let i = 0; i < userData.length; i++){
-                console.log(userData[i][0] + " :--: " + await getCurrentPrice(userData[i][0]))
+
+            if(request.url === "/prices"){
+                await loadPrices();//sets prices in arrays
+                response.writeHeader(200, {"Content-Type": "text/plain"});
+                for(let i = 0; i < userData.length; i++){
+                    try{
+                        response.write(userData[i][0].toString() + " :---: " + userData[i][2].toString() + "<br>");
+                    }catch(e){
+                        console.log("Price not loaded");
+                    }
+                }
+                response.end();
             }
-            
-            response.writeHeader(200, {"Content-Type": "text/html"});
-            response.write(html);
-            response.end();
+
+            if(request.url === "/"){
+
+                response.writeHeader(200, {"Content-Type": "text/html"});
+                response.write(html);
+                response.end();
+            }
         }
     }).listen(8080)
 });
 
+async function loadPrices(){
+    for(let i = 0; i < userData.length; i++){
+        if(userData[i][2] == undefined){
+            userData[i][2] = await getCurrentPrice(userData[i][0]);
+        }
+        
+    }
+}
 
 async function getCurrentPrice(symbol){ //call "await getCurrentPrice('NVDA');"
     //let date = today();
@@ -57,6 +74,7 @@ async function getCurrentPrice(symbol){ //call "await getCurrentPrice('NVDA');"
     const jsonData = await response.json();
     //console.log(jsonData)
     try{
+        console.log("price got")
         return jsonData["Global Quote"]["05. price"]; 
     }catch(e){}
     //return jsonData['Time Series (Daily)'][date]["4. close"]; 
@@ -74,17 +92,30 @@ async function getCurrentPrice(symbol){ //call "await getCurrentPrice('NVDA');"
     
     if(mm<10) {
         mm = '0'+mm;
-    } 
+    }
 
     return yyyy+'-'+mm+'-'+dd;
 }*/
 
-function updateUserData(){ 
+function updateUserData(init){ 
     var Reader = lineReader.createInterface({
         input: fs.createReadStream('userdata.txt')
     });
       
     Reader.on('line', function (line) {
-        userData.push(line.split(" "));
+        if(init){
+            userData.push(line.split(" "));
+            console.log(userData)
+        }else{
+            for(let i = 0; i < userData.length; i++){
+                if(userData[i][0] == line.split(" ")[0] && userData[i][1] == line.split(" ")[1]){
+                    break;
+                }
+                if(i+1 == userData.length){
+                    userData.push(line.split(" "));
+                    break;
+                }
+            }
+        }
     });
 }
