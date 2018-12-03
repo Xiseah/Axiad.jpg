@@ -1,0 +1,19 @@
+body {
+    background-color: white;
+}
+
+table#mainTable{
+    text-align: center;
+}
+
+table#mainTable th{
+    background-color: rgb(107, 137, 194);
+}
+
+table#mainTable tr:nth-child(even){
+    background-color: rgba(124, 124, 124, 0.651)
+}
+
+table#mainTable tr:nth-child(odd){
+    background-color: rgba(124, 124, 124, 0.192)
+}

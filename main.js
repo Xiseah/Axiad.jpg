@@ -1,9 +1,11 @@
-const fetch = require("node-fetch")
-const fs = require("fs")
-var http = require('http')
+console.log("Starting..");
+const fetch = require("node-fetch");
+const fs = require("fs");
+var http = require('http');
+const {promisify} = require('util');
 var lineReader = require('readline');
 let userData = []; // [][name, boughtFor, livePrice]
-updateUserData(true); //reads userdata.txt
+updateUserData(); //reads userdata.txt
 let apikey = "W94GLMLUDBL7TFZ8";
 
 function url(symbol){
@@ -12,57 +14,94 @@ function url(symbol){
     
 fs.readFile('./index.html', function (err, html) {
     if (err) throw err;
-
+    console.log("Ready");
     http.createServer(async function (request, response) {
-        if(request.url === "/favicon.ico"){
-            response.end();
-        }else{
-
-            let body = '';
-            request.on('data', data => {
-                body += data.toString(); // convert Buffer to string
-            });
-            request.on('end', () => {
-                if(body != ''){
-
-                    body = body.replace("name=", "")
-                    body = body.replace("&price=", " ")
-
-                    fs.appendFile('userdata.txt', body+"\n", function (err) {
-                        updateUserData(false);
-                    });
-                }
-            });
-
-            if(request.url === "/prices"){
-                await loadPrices();//sets prices in arrays
-                response.writeHeader(200, {"Content-Type": "text/plain"});
-                for(let i = 0; i < userData.length; i++){
-                    try{
-                        response.write(userData[i][0].toString() + " :---: " + userData[i][2].toString() + "<br>");
-                    }catch(e){
-                        console.log("Price not loaded");
-                    }
-                }
+        
+        switch(request.url){
+            case "/favicon.ico":
                 response.end();
-            }
+                break;
 
-            if(request.url === "/"){
+            case "/prices": 
+                await loadPrices(); //sets prices in arrays
+                response.writeHeader(200, {"Content-Type": "text/plain"});
+                if (userData != undefined){
+                    for(let i = 0; i < userData.length; i++){
+                        try{
+                            response.write(userData[i][0].toString() + " " + userData[i][1].toString() + " " + userData[i][2].toString() + " ");
+                        }catch(e){
+                            console.log("Price not loaded")
+                        }
+                    }
+                    response.end();
+                    break;
+                }else{
+                    response.end();
+                    break;
+                }
+            case "/":
 
+                let body = '';
+                request.on('data', data => {
+                    body += data.toString(); // convert Buffer to string
+                });
+                request.on('end', () => {
+                    if(body != ''){
+                        body = body.replace("name=", "")
+                        body = body.replace("&price=", " ")
+
+                        fs.appendFile('userdata.txt', body+"\n", function (err){
+                            updateUserData();
+                        });
+                        
+                    }
+                });
                 response.writeHeader(200, {"Content-Type": "text/html"});
                 response.write(html);
                 response.end();
-            }
+                break;
+
+            case "/css":
+                fs.readFile('./styles.css', function (err, css) {
+                    if (err) throw err;
+                    response.writeHeader(200, {"Content-Type": "text/css"});
+                    response.write(css);
+                    response.end();
+                });
+                break;
+
+            case "/delete":
+                let nr = '';
+                request.on('data', data => {
+                    nr = data.toString();
+                });
+                request.on('end', () => {
+                    if(nr != ''){
+                        deleteData(parseInt(nr)-1).then(() => { //row-1 == array index
+                            response.end();
+                        });
+                    }
+                });
+                break;
+            default:
+                response.end();
+                break;
         }
     }).listen(8080)
 });
 
 async function loadPrices(){
-    for(let i = 0; i < userData.length; i++){
-        if(userData[i][2] == undefined){
-            userData[i][2] = await getCurrentPrice(userData[i][0]);
+    if(userData != undefined){
+        for(let i = 0; i < userData.length; i++){
+            if(userData[i][2] == undefined || userData[i][2] == "not_loaded"){
+                let x = await getCurrentPrice(userData[i][0]);
+                if(x == "err"){
+                    userData[i][2] = "not_loaded";
+                }else{
+                    userData[i][2] = x;
+                }
+            }
         }
-        
     }
 }
 
@@ -74,48 +113,126 @@ async function getCurrentPrice(symbol){ //call "await getCurrentPrice('NVDA');"
     const jsonData = await response.json();
     //console.log(jsonData)
     try{
-        console.log("price got")
         return jsonData["Global Quote"]["05. price"]; 
-    }catch(e){}
-    //return jsonData['Time Series (Daily)'][date]["4. close"]; 
+    }catch(e){
+        return "err";
+    }
 }
 
-/*function today(){
-    var today = new Date();
-    var dd = today.getDate();
-    var mm = today.getMonth()+1;
-    var yyyy = today.getFullYear();
-    console.log(dd)
-    if(dd<10) {
-        dd = '0'+dd;
-    }
-    
-    if(mm<10) {
-        mm = '0'+mm;
-    }
+function deleteData(row){
+    return new Promise(function(resolve, reject) {
+        
+        getUserData()
+        .then((text) => {
+            let data = text.toString().split("\n");
+            data.splice(row, 1);
+            return data;
 
-    return yyyy+'-'+mm+'-'+dd;
-}*/
-
-function updateUserData(init){ 
-    var Reader = lineReader.createInterface({
-        input: fs.createReadStream('userdata.txt')
-    });
-      
-    Reader.on('line', function (line) {
-        if(init){
-            userData.push(line.split(" "));
-            console.log(userData)
-        }else{
-            for(let i = 0; i < userData.length; i++){
-                if(userData[i][0] == line.split(" ")[0] && userData[i][1] == line.split(" ")[1]){
-                    break;
-                }
-                if(i+1 == userData.length){
-                    userData.push(line.split(" "));
-                    break;
+        }).then((data) => {
+            let result = "";
+            for(let i = 0; i < data.length; i++){
+                result += data[i].toString();
+                if(i != data.length-1){ 
+                    result += "\n";
+                    if(i == data.length-2){ //on last cycle
+                        return result;
+                    }
                 }
             }
-        }
+        }).then((result) => {
+            if(result == undefined){ //if userdata.txt empty
+                result = ""; 
+            }
+            
+            fs.writeFile("./userdata.txt", result, 'utf8', function (err) {
+                if (err) {
+                    console.log(err)
+                }
+                
+                return;
+            });
+        }).then(() => {
+            updateUserData().then(() => {
+                updateUserData().then(() => {
+                    resolve();
+                })
+            })
+            
+        }).catch((err) => {
+            console.log(err);
+            reject();
+        });
+    });
+}
+
+function getUserData(){
+    return new Promise(function(resolve, reject) {
+        fs.readFile("./userdata.txt", (err, data) => {
+            if(err) {
+                console.log(err)
+                reject();
+            }
+            resolve(data);
+        });
+    });
+}
+
+function updateUserData(){
+
+    return new Promise(function(resolve, reject) {
+
+        getUserData()
+        .then((data) => {
+            return data.toString().split("\n");
+        })
+        .then((arr) => {
+            arr.splice(arr.length-1, 1);
+            let data = [];
+            for(let i = 0; i < arr.length; i++){
+                data.push(arr[i].split(" "));
+                if(i == arr.length-1){ //if on last cycle
+                    return data;
+                }
+            }
+        })
+        .then((data) => {
+            if(userData != undefined){
+                if(data == undefined){
+                    userData = [];
+                    return;
+                }else if(userData.length == 0){
+                    userData = data;
+                    return;
+                }else if(userData.length > data.length){ //if an element is removed
+                    let i = 0;
+                    while(data[i] != undefined){
+                        if(userData[i][0] != data[i][0]){
+                            if(userData[i][1] != data[i][1]){
+                                userData.splice(i, 1); // if data isnt same, remove
+                                return;
+                            }
+                        }
+                        i++;
+                    }
+                    userData.splice(userData.length-1, 1);
+                    return;
+                }else if(userData.length < data.length){ //if an element is added
+                    userData.push(data[data.length-1]); //push the added element
+                    return;
+                }
+            }else{
+                console.log("error")
+                return;
+            }
+        })
+        .then(() => {
+            loadPrices();
+            resolve();
+        })
+        .catch((err) => {
+            console.log(err);
+            reject();
+       
+        });
     });
 }

@@ -1,40 +1,136 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Axiad</title>
-    
-</head>
-<body>
 
-    <form action="/" method="POST">
-        <input type="text" name="name" />
-        <input type="text" name="price" />
-        <button>Add</button>
+  <head>
+
+      <link rel="stylesheet" href="/css">
+
+    <title>Axiad</title>
+  </head>
+
+  <body>
+
+    <form method="POST">
+      <table>
+        <tr>
+          <th>Stock name</th>
+          <th>Bought for</th>
+        </tr>
+        <tr>
+          <td><input type="text" name="name"/></td>  
+          <td><input type="text" name="price"/></td>
+          <td><input type="submit" value="add"></td>
+        </tr>
+
+      </table>
+
+
+
+      
     </form>
 
-    <button type="button" onclick="loadDoc()">Get Prices</button>
+    <button type="button" onclick="loadPrices()">Get Prices</button>
 
-    <p id="text"></p>
+    <div id="table"></div>
 
     <script>
-        function loadDoc() {
-          var xhttp = new XMLHttpRequest();
-          xhttp.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-              document.getElementById("text").innerHTML = this.responseText;
+      
+      function loadPrices() {
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function() {
+          if (this.readyState == 4 && this.status == 200) {
+            var response = this.responseText.split(" ");
+            var data = [];
+            for(let i = 0; i+1 < response.length/3; i++){
+              data[i] = [response[i*3], response[i*3+1], response[i*3+2]];
             }
-          };
-          xhttp.open("GET", "http://localhost:8080/prices", true);
-          xhttp.send();
+            console.log(data)
+            draw(data);
+            
+          }
+        };
+        xhttp.open("GET", "http://localhost:8080/prices", true);
+        xhttp.send();
+      }
+
+      function draw(data){
+        //TODO draw graphs
+
+        table(data);
+      }
+      
+      function removeCell(row){
+        
+        var xhttp = new XMLHttpRequest();
+        xhttp.open("POST", "http://localhost:8080/delete", true);
+        xhttp.setRequestHeader("Content-type", "text/plain");
+        xhttp.send(row);
+        xhttp.onreadystatechange = function() {
+          if (this.readyState == 4 && this.status == 200) {
+            loadPrices();
+          }
         }
-        </script>
+        
+      }
+        
 
+      function table(data){
 
+        var table = document.createElement("table");
+        table.setAttribute("id", "mainTable")
 
+        let tr = []; //rows
+        let th = []; //headings
+        let td; //tabledata
 
-</body>
+        for(let i = 0; i < data.length+1; i++){
+          tr.push(document.createElement("tr"));
+        } //create rows equal to stock amount (+1 for heading)
 
+        for(let i = 0; i < 4; i++){
+          th.push(document.createElement("th"))
+        } //create headings
 
+        th[1].appendChild(document.createTextNode("Stock"));
+        th[2].appendChild(document.createTextNode("Bought"));
+        th[3].appendChild(document.createTextNode("Current"));
 
+        for(let i = 0; i < 4; i++){
+          tr[0].appendChild(th[i]);
+        } //add headings to row
+
+        table.appendChild(tr[0]); //add headings to table
+        
+        for(let j = 1; j < tr.length; j++){//each row (heading excluded)
+
+          let button = document.createElement("button");
+          button.setAttribute("type", "button");
+          button.innerHTML = "X";
+          button.addEventListener("click", function(event) {
+            removeCell(j);
+          });
+          
+          tr[j].appendChild(button); //add X button
+          
+          for(let i = 0; i < 3; i++){ //each data cell
+            td = document.createElement("td");
+            td.appendChild(document.createTextNode(data[j-1][i])); //set text
+            tr[j].appendChild(td); //add data cell to row
+          }
+
+          table.appendChild(tr[j]); //add cell rows to table
+        }
+
+        var tableNode = document.getElementById("table");
+        while (tableNode.firstChild) {
+          tableNode.removeChild(tableNode.firstChild);
+        }
+        tableNode.appendChild(table);
+
+      }
+
+    </script>
+
+  </body>
 
 </html>
