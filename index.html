@@ -17,9 +17,9 @@
           <th>Bought for</th>
         </tr>
         <tr>
-          <td><input type="text" name="name"/></td>  
+          <td><input type="text" name="name"/></td>
           <td><input type="text" name="price"/></td>
-          <td><input type="submit" value="add"></td>
+          <td><input type="submit" value="add" ></td>
         </tr>
 
       </table>
@@ -46,7 +46,6 @@
             }
             console.log(data)
             draw(data);
-            
           }
         };
         xhttp.open("GET", "http://localhost:8080/prices", true);
@@ -55,7 +54,7 @@
 
       function draw(data){
         //TODO draw graphs
-
+        
         table(data);
       }
       
@@ -70,9 +69,7 @@
             loadPrices();
           }
         }
-        
       }
-        
 
       function table(data){
 
@@ -101,7 +98,7 @@
 
         table.appendChild(tr[0]); //add headings to table
         
-        for(let j = 1; j < tr.length; j++){//each row (heading excluded)
+        for(let j = 1; j < tr.length; j++){ //each row (heading excluded)
 
           let button = document.createElement("button");
           button.setAttribute("type", "button");
