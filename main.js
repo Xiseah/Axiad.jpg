@@ -4,14 +4,10 @@ const fs = require("fs");
 var http = require('http');
 const {promisify} = require('util');
 var lineReader = require('readline');
-let userData = []; // [][name, boughtFor, livePrice]
+let userData = []; // [index][name, quantity, boughtFor, Prices]
 let apikey = "W94GLMLUDBL7TFZ8";
-
 updateUserData().then(() => startServer()); //sets userdata, then starts the server
 
-function url(symbol){
-    return "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol="+symbol+"&apikey="+apikey;
-}
 function startServer(){
     fs.readFile('./index.html', function (err, html) {
         if (err) throw err;
@@ -24,24 +20,35 @@ function startServer(){
                     break;
     
                 case "/prices": 
-                    updateUserData();
-                    response.writeHeader(200, {"Content-Type": "text/plain"});
-                    if (userData != undefined){
-                        for(let i = 0; i < userData.length; i++){
-                            try{
-                                response.write(userData[i][0].toString() + " " + userData[i][1].toString() + " " + userData[i][2].toString() + " ");
-                            }catch(e){
-                                console.log("Price not loaded")
+                    updateUserData().then(() => {
+                        response.writeHeader(200, {"Content-Type": "text/plain"});
+                        if (userData != undefined){
+                            
+                            for(let i = 0; i < userData.length; i++){
+                                try{
+                                    for(let j = 0; j < 3; j++){
+                                        response.write(userData[i][j].toString() + "&");
+                                    }
+                                    for(let j = 0; j < userData[i][3].length; j++){
+                                        response.write(userData[i][3][j].toString() + " ");
+                                        if(j == userData[i][3].length-1){
+                                            response.write("&")
+                                        }
+                                    }
+                                }catch(e){
+                                    console.log("Price not loaded")
+                                }
                             }
+                            response.end();
+                            return;
+                        }else{
+                            response.end();
+                            return;
                         }
-                        response.end();
-                        break;
-                    }else{
-                        response.end();
-                        break;
-                    }
+                    });
+                    break;
+
                 case "/":
-    
                     let body = '';
                     request.on('data', data => {
                         body += data.toString(); // convert Buffer to string
@@ -49,6 +56,7 @@ function startServer(){
                     request.on('end', () => {
                         if(body != ''){
                             body = body.replace("name=", "")
+                            body = body.replace("&qty=", " ")
                             body = body.replace("&price=", " ")
     
                             fs.appendFile('userdata.txt', body+"\n", function (err){
@@ -92,37 +100,50 @@ function startServer(){
     });
 }
 
+function url(symbol){
+    return "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol="
+            +symbol+"&apikey="+apikey;
+}
+
+function getPrices(symbol){
+    return fetch(url(symbol))
+    .then(result => {
+        return result.json();
+    }).then(json => {
+        let dates = Object.keys(json["Time Series (Daily)"]);
+        let arr = [];
+        for(let i = 0; i < dates.length; i++){
+            arr.push([dates[i], json["Time Series (Daily)"][dates[i]]["4. close"]])
+            if(i == dates.length-1){ //last cycle
+                return arr;
+            }
+        }
+    }).catch(err => {
+        console.log("Price not loaded")
+        return "err";
+    })
+}
 
 function loadPrices(){
     return new Promise(async function(resolve, reject) {
-        if(userData != undefined){
+        if(userData != undefined && userData != [] && userData.length != 0){
             for(let i = 0; i < userData.length; i++){
-                if(userData[i][2] == undefined || userData[i][2] == "not_loaded"){
-                    let price = await getCurrentPrice(userData[i][0]);
-                    if(price == "err"){
-                        userData[i][2] = "not_loaded";
+                if(userData[i][3] == undefined || userData[i][3] == "not_loaded"){
+                    let prices = await getPrices(userData[i][0]);
+                    if(prices == "err"){
+                        userData[i][3] = "not_loaded";
                     }else{
-                        userData[i][2] = price;
+                        userData[i][3] = prices;
                     }
                 }
                 if(i == userData.length-1){ //on last cycle
                     resolve();
                 }
-
             }
+        }else{
+            resolve();
         }
     });
-}
-
-function getCurrentPrice(symbol){
-    return fetch(url(symbol))
-    .then(result => {
-        return result.json();
-    }).then(json => {
-        return json["Global Quote"]["05. price"];
-    }).catch(err => {
-        return "err";
-    })
 }
 
 function deleteData(row){
@@ -145,6 +166,7 @@ function deleteData(row){
                     }
                 }
             }
+
         }).then(result => {
             if(result == undefined){ //if userdata.txt empty
                 result = ""; 
@@ -154,15 +176,19 @@ function deleteData(row){
                 if (err) {
                     console.log(err)
                 }
-                
                 return;
             });
-        }).then(() => { //remove array from userData
-            userData.splice(row, 1);
+
+        }).then(() => { 
+            userData.splice(row, 1); //remove array from userData
+
         }).then(() => {
             updateUserData().then(() => {
-                resolve();
+                updateUserData().then(() => {
+                    resolve();
+                })
             })
+
         }).catch(err => {
             console.log(err);
             reject();
@@ -215,14 +241,15 @@ function updateUserData(){
             }
         })
         .then(() => {
-            loadPrices().then(() => { //sets prices in arrays
+            //sets prices in arrays
+            loadPrices()
+            .then(() => {
                 resolve();
-            });
+            })
         })
         .catch(err => {
             console.log(err);
             reject();
-       
         });
     });
 }

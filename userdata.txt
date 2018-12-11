@@ -1,3 +1,1 @@
-AMD 4
-MNST 6
-MSFT 5
+AMD 5 4

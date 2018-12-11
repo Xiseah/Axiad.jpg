@@ -14,10 +14,12 @@
       <table>
         <tr>
           <th>Stock name</th>
+          <th>Quantity</th>
           <th>Bought for</th>
         </tr>
         <tr>
           <td><input type="text" name="name"/></td>
+          <td><input type="text" name="qty"/></td>
           <td><input type="text" name="price"/></td>
           <td><input type="submit" value="add" ></td>
         </tr>
@@ -39,12 +41,23 @@
         var xhttp = new XMLHttpRequest();
         xhttp.onreadystatechange = function() {
           if (this.readyState == 4 && this.status == 200) {
-            var response = this.responseText.split(" ");
+            let response = this.responseText.split("&");
             var data = [];
-            for(let i = 0; i+1 < response.length/3; i++){
-              data[i] = [response[i*3], response[i*3+1], response[i*3+2]];
+
+            for(let j = 0; j < response.length; j+=4){
+              let arr = [];
+              let prices = [];
+              for(let i = 0; i < ("" + response[j+3]).split(" ").length; i++){
+              prices.push(("" + (""  + response[j+3]).split(" ")[i]).split(","));
+              }
+              prices.pop(prices.length-1, 1)
+              for(let i = 0; i < 3; i++){
+                arr.push(response[i+j]);
+              }
+              arr.push(prices);
+              data.push(arr);
             }
-            console.log(data)
+            data.pop(data.length-1, 1)
             draw(data);
           }
         };
@@ -52,9 +65,12 @@
         xhttp.send();
       }
 
-      function draw(data){
-        //TODO draw graphs
+      function draw(data){ 
+
+        //data[index][stockname(0),qty(1),boughtFor(2),prices(3)][priceindex][date(0), price(1)]
         
+        //TODO draw graphs
+        console.log(data);
         table(data);
       }
       
@@ -84,15 +100,16 @@
           tr.push(document.createElement("tr"));
         } //create rows equal to stock amount (+1 for heading)
 
-        for(let i = 0; i < 4; i++){
+        for(let i = 0; i < 5; i++){
           th.push(document.createElement("th"))
         } //create headings
 
         th[1].appendChild(document.createTextNode("Stock"));
-        th[2].appendChild(document.createTextNode("Bought"));
-        th[3].appendChild(document.createTextNode("Current"));
+        th[2].appendChild(document.createTextNode("Quantity"));
+        th[3].appendChild(document.createTextNode("Bought"));
+        th[4].appendChild(document.createTextNode("Current"));
 
-        for(let i = 0; i < 4; i++){
+        for(let i = 0; i < 5; i++){
           tr[0].appendChild(th[i]);
         } //add headings to row
 
@@ -109,9 +126,19 @@
           
           tr[j].appendChild(button); //add X button
           
-          for(let i = 0; i < 3; i++){ //each data cell
+          for(let i = 0; i < 4; i++){ //each data cell
             td = document.createElement("td");
-            td.appendChild(document.createTextNode(data[j-1][i])); //set text
+            if(i==3){
+              let price = data[j-1][3][0][1];
+              if(price == undefined){
+                td.appendChild(document.createTextNode("not_loaded"));
+              }else{
+                td.appendChild(document.createTextNode(price)); //set current price
+              }
+            }else{
+              td.appendChild(document.createTextNode(data[j-1][i])); //set text
+            }
+            
             tr[j].appendChild(td); //add data cell to row
           }
 
