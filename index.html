@@ -41,24 +41,7 @@
         var xhttp = new XMLHttpRequest();
         xhttp.onreadystatechange = function() {
           if (this.readyState == 4 && this.status == 200) {
-            let response = this.responseText.split("&");
-            var data = [];
-
-            for(let j = 0; j < response.length; j+=4){
-              let arr = [];
-              let prices = [];
-              for(let i = 0; i < ("" + response[j+3]).split(" ").length; i++){
-              prices.push(("" + (""  + response[j+3]).split(" ")[i]).split(","));
-              }
-              prices.pop(prices.length-1, 1)
-              for(let i = 0; i < 3; i++){
-                arr.push(response[i+j]);
-              }
-              arr.push(prices);
-              data.push(arr);
-            }
-            data.pop(data.length-1, 1)
-            draw(data);
+            draw(JSON.parse(this.responseText));
           }
         };
         xhttp.open("GET", "http://localhost:8080/prices", true);
@@ -68,9 +51,9 @@
       function draw(data){ 
 
         //data[index][stockname(0),qty(1),boughtFor(2),prices(3)][priceindex][date(0), price(1)]
-        
+        console.log(data)
+
         //TODO draw graphs
-        console.log(data);
         table(data);
       }
       

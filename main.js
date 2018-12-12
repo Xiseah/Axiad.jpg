@@ -11,7 +11,9 @@ updateUserData().then(() => startServer()); //sets userdata, then starts the ser
 function startServer(){
     fs.readFile('./index.html', function (err, html) {
         if (err) throw err;
+
         console.log("Ready");
+
         http.createServer(function (request, response) {
             
             switch(request.url){
@@ -21,24 +23,10 @@ function startServer(){
     
                 case "/prices": 
                     updateUserData().then(() => {
-                        response.writeHeader(200, {"Content-Type": "text/plain"});
                         if (userData != undefined){
-                            
-                            for(let i = 0; i < userData.length; i++){
-                                try{
-                                    for(let j = 0; j < 3; j++){
-                                        response.write(userData[i][j].toString() + "&");
-                                    }
-                                    for(let j = 0; j < userData[i][3].length; j++){
-                                        response.write(userData[i][3][j].toString() + " ");
-                                        if(j == userData[i][3].length-1){
-                                            response.write("&")
-                                        }
-                                    }
-                                }catch(e){
-                                    console.log("Price not loaded")
-                                }
-                            }
+                            response.writeHeader(200, {"Content-Type": "text/plain"});
+                            response.write(JSON.stringify(userData));
+
                             response.end();
                             return;
                         }else{
@@ -55,14 +43,13 @@ function startServer(){
                     });
                     request.on('end', () => {
                         if(body != ''){
-                            body = body.replace("name=", "")
-                            body = body.replace("&qty=", " ")
-                            body = body.replace("&price=", " ")
+                            body = body.replace("name=", "");
+                            body = body.replace("&qty=", " ");
+                            body = body.replace("&price=", " ");
     
                             fs.appendFile('userdata.txt', body+"\n", function (err){
                                 updateUserData();
                             });
-                            
                         }
                     });
                     response.writeHeader(200, {"Content-Type": "text/html"});
